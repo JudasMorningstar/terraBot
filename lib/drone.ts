@@ -1,10 +1,12 @@
 import axios from "axios";
 
-const API_BASE_URL = "http://localhost:3000/api";
+const API_BASE_URL = process.env.NEXT_PUBLIC_VERCEL_URL
+  ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}/api`
+  : "http://localhost:3000/api";
 
 export const takeoff = async () => {
   try {
-    const response = await axios.post(`http://127.0.0.1:5328/takeoff`);
+    const response = await axios.post(`${API_BASE_URL}/takeoff`);
     return response.data;
   } catch (error) {
     console.error("Error taking off:", error);
@@ -24,7 +26,7 @@ export const health = async () => {
 
 export const land = async () => {
   try {
-    const response = await axios.post(`http://localhost:5328/land`);
+    const response = await axios.post(`${API_BASE_URL}/land`);
     return response.data;
   } catch (error) {
     console.error("Error landing:", error);
