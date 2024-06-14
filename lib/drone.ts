@@ -1,8 +1,7 @@
 import axios from "axios";
+import { toast } from "sonner";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_VERCEL_URL
-  ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}/api`
-  : "http://localhost:3000/api";
+const API_BASE_URL = "http://localhost:3000/api";
 
 export const takeoff = async () => {
   try {
@@ -30,6 +29,17 @@ export const land = async () => {
     return response.data;
   } catch (error) {
     console.error("Error landing:", error);
+    throw error;
+  }
+};
+
+export const getBatteryStatus = async () => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/battery`);
+    return response.data;
+  } catch (error) {
+    console.error("Error getting battery status:", error);
+    toast.error("error");
     throw error;
   }
 };
