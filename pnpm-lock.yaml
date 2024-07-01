@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@mediapipe/tasks-vision':
+        specifier: ^0.10.14
+        version: 0.10.14
       '@radix-ui/react-aspect-ratio':
         specifier: ^1.0.3
         version: 1.0.3(@types/react-dom@18.2.4)(@types/react@18.2.6)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
@@ -197,6 +200,9 @@ packages:
 
   '@jridgewell/trace-mapping@0.3.25':
     resolution: {integrity: sha512-vNk6aEwybGtawWmy/PzwnGDOjCkLWSD2wqvjGGAgOAwCGWySYXfYoxt00IJkTF+8Lb57DwOb3Aa0o9CApepiYQ==}
+
+  '@mediapipe/tasks-vision@0.10.14':
+    resolution: {integrity: sha512-vOifgZhkndgybdvoRITzRkIueWWSiCKuEUXXK6Q4FaJsFvRJuwgg++vqFUMlL0Uox62U5aEXFhHxlhV7Ja5e3Q==}
 
   '@next/env@13.4.3':
     resolution: {integrity: sha512-pa1ErjyFensznttAk3EIv77vFbfSYT6cLzVRK5jx4uiRuCQo+m2wCFAREaHKIy63dlgvOyMlzh6R8Inu8H3KrQ==}
@@ -2383,6 +2389,8 @@ snapshots:
     dependencies:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.4.15
+
+  '@mediapipe/tasks-vision@0.10.14': {}
 
   '@next/env@13.4.3': {}
 

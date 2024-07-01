@@ -1,8 +1,24 @@
 import { create } from "zustand";
 import axios from "axios";
-import { DroneState } from "@/types";
+// import { DroneState } from "@/types";
 import { toast } from "sonner";
-import { get } from "http";
+
+interface DroneState {
+  flight_time: number | null;
+  isFlying: boolean;
+  batteryLevel: number | null;
+  speed: number | null;
+  distance: number | null;
+  temperature: number | null;
+  altitude: number | null;
+  videoFeedUrl: string;
+  warningMessage: string;
+  takeoff: () => Promise<void>;
+  land: () => Promise<void>;
+  fetchDroneStatus: () => Promise<void>;
+  performSequence: () => Promise<void>;
+  controlDrone: (direction: string, speed?: number) => Promise<void>;
+}
 
 const API_BASE_URL = "http://localhost:3000/api";
 const useDroneStore = create<DroneState>((set, get) => ({
@@ -57,6 +73,33 @@ const useDroneStore = create<DroneState>((set, get) => ({
       }
     } catch (error) {
       console.error("Error fetching drone status:", error);
+    }
+  },
+  performSequence: async () => {
+    try {
+      const response = await axios.post(`${API_BASE_URL}/perform_sequence`);
+      const data = response.data;
+      if (data.status === "success") {
+        console.log("Sequence completed successfully");
+      } else {
+        console.error("Error performing sequence:", data.message);
+      }
+    } catch (error) {
+      console.error("Error performing sequence:", error);
+    }
+  },
+  controlDrone: async (direction, speed = 50) => {
+    try {
+      await axios.post(`${API_BASE_URL}/control`, {
+        direction,
+        speed,
+      });
+    } catch (error) {
+      toast.error(`Error controlling drone (${direction} at speed ${speed})`);
+      console.error(
+        `Error controlling drone (${direction} at speed ${speed}):`,
+        error
+      );
     }
   },
 }));

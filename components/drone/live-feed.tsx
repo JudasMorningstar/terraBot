@@ -23,28 +23,12 @@ export default function LiveFeed() {
 
   return (
     <>
-      <Card className="xl:col-span-2">
-        <CardHeader>
-          <AspectRatio ratio={16 / 9}>
-            <img
-              className="rounded-md"
-              src={videoFeedUrl}
-              alt="Live Video Feed"
-              style={{ width: "100%", maxHeight: "100%" }}
-            />
-          </AspectRatio>
-        </CardHeader>
-        <CardFooter>
-          <div className="flex gap-4 justify-between w-full">
-            <Button className="w-full" onClick={takeoff}>
-              Launch
-            </Button>
-            <Button className="w-full" onClick={land}>
-              Land
-            </Button>
-          </div>
-        </CardFooter>
-      </Card>
+      <img
+        className="rounded-md"
+        src={videoFeedUrl}
+        alt="Live Video Feed"
+        style={{ width: "100%", maxHeight: "100%" }}
+      />
     </>
   );
 }

@@ -16,6 +16,7 @@ export interface DroneState {
   altitude: number | null;
   videoFeedUrl: string;
   warningMessage: string;
+  performSequence: () => Promise<void>;
   takeoff: () => Promise<void>;
   land: () => Promise<void>;
   fetchDroneStatus: () => Promise<void>;
