@@ -52,6 +52,10 @@ SCENE_OBJECTS = (
 
 class SimulatedDrone(DroneAdapter):
     name = "Simulator"
+    description = "A virtual drone for trying the dashboard without any hardware."
+    simulated = True
+    max_speed = MAX_SPEED
+    max_altitude = MAX_ALTITUDE
     capabilities = frozenset({CAP_VIDEO, CAP_POSITION, CAP_TEMPERATURE})
 
     def __init__(self, autostart: bool = True) -> None:

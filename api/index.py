@@ -67,7 +67,8 @@ def emergency_stop():
 
 @app.route("/api/drone_status", methods=["GET"])
 def drone_status():
-    t = get_drone().get_telemetry()
+    drone = get_drone()
+    t = drone.get_telemetry()
     return ok(
         # Keys the current frontend reads:
         flight_time=t.flight_time,
@@ -78,6 +79,7 @@ def drone_status():
         altitude=t.altitude,
         # Extra fields:
         is_flying=t.is_flying,
+        sequence_running=drone.sequence_running,
         x=t.x,
         y=t.y,
         heading=t.heading,

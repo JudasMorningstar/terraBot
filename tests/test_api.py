@@ -18,12 +18,14 @@ def post(client, path, **body):
 def test_info(client):
     data = client.get("/api/drone_info").get_json()
     assert data["name"] == "Simulator" and "video" in data["capabilities"]
+    assert data["simulated"] is True and data["max_altitude"] == 10.0
 
 
 def test_takeoff_status_land(client):
     assert post(client, "/api/takeoff").get_json()["status"] == "success"
     status = client.get("/api/drone_status").get_json()
     assert status["is_flying"] and status["battery_level"] <= 100
+    assert status["sequence_running"] is False
     assert post(client, "/api/land").get_json()["status"] == "success"
 
 

@@ -60,7 +60,12 @@ class DroneAdapter(ABC):
     """Common interface for all drones."""
 
     name: str = "drone"
+    description: str = ""
     capabilities: frozenset = frozenset()
+    simulated: bool = False
+    # Published limits shown in the UI; None = unknown / not shown.
+    max_speed: Optional[float] = None  # m/s
+    max_altitude: Optional[float] = None  # m
 
     # If no move() arrives for this long, the drone is told to stop. This
     # stops a drone running away when a key-up / network packet is lost.
@@ -178,4 +183,11 @@ class DroneAdapter(ABC):
 
     # ------------------------------------------------------------------
     def info(self) -> dict:
-        return {"name": self.name, "capabilities": sorted(self.capabilities)}
+        return {
+            "name": self.name,
+            "description": self.description,
+            "capabilities": sorted(self.capabilities),
+            "max_speed": self.max_speed,
+            "max_altitude": self.max_altitude,
+            "simulated": self.simulated,
+        }

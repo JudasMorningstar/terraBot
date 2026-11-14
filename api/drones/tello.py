@@ -18,6 +18,7 @@ from .base import (
 
 class TelloAdapter(DroneAdapter):
     name = "DJI Tello"
+    description = "A compact, beginner-friendly drone with a 5MP camera."
     capabilities = frozenset({CAP_VIDEO, CAP_TOF_SENSOR, CAP_TEMPERATURE})
 
     FRAME_INTERVAL = 1 / 30

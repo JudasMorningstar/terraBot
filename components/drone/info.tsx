@@ -12,6 +12,7 @@ import {
   CardContent,
 } from "../ui/card";
 import useDroneStore from "@/lib/store/drone-store";
+import { Badge } from "../ui/badge";
 
 export default function DroneInfo() {
   const {
@@ -21,22 +22,37 @@ export default function DroneInfo() {
     distance,
     temperature,
     altitude,
+    x,
+    y,
+    heading,
+    info,
+    connected,
+    fetchDroneInfo,
     fetchDroneStatus,
   } = useDroneStore();
 
   useEffect(() => {
-    const interval = setInterval(() => {
+    const poll = () => {
+      if (!useDroneStore.getState().info) fetchDroneInfo();
       fetchDroneStatus();
-    }, 5000); // Fetch drone status every 5 seconds
+    };
+    poll();
+    const interval = setInterval(poll, 2000);
     return () => clearInterval(interval);
-  }, [fetchDroneStatus]);
+  }, [fetchDroneInfo, fetchDroneStatus]);
+
+  const has = (capability: string) =>
+    info?.capabilities.includes(capability) ?? false;
+  const unknown = <span>Unknown</span>;
   return (
     <>
       <Card x-chunk="dashboard-01-chunk-5">
         <CardHeader className="flex flex-row items-start bg-muted/50">
           <div className="grid gap-0.5">
             <CardTitle className="group flex items-center gap-2 text-lg">
-              DJI Tello
+              {info?.name ?? "Connecting…"}
+              {info?.simulated && <Badge variant="secondary">Virtual</Badge>}
+              {!connected && <Badge variant="destructive">Offline</Badge>}
               <Button
                 size="icon"
                 variant="outline"
@@ -47,8 +63,7 @@ export default function DroneInfo() {
               </Button>
             </CardTitle>
             <CardDescription>
-              The DJI Tello is a compact, beginner-friendly drone with a 5MP
-              camera.
+              {info?.description ?? "Waiting for the drone API…"}
             </CardDescription>
           </div>
         </CardHeader>
@@ -61,26 +76,31 @@ export default function DroneInfo() {
                 {batteryLevel !== null ? (
                   <span>{batteryLevel}%</span>
                 ) : (
-                  <span>Unkown</span>
+                  unknown
                 )}
               </li>
-              <li className="flex items-center justify-between">
-                <span className="text-muted-foreground">Temperature</span>
-                {temperature !== null ? (
-                  <span>{temperature} (°C)</span>
-                ) : (
-                  <span>Unkown</span>
-                )}
-              </li>
-              <li className="flex items-center justify-between">
-                <span className="text-muted-foreground">Max Speed</span>
-
-                <span>0,5 (m/s)</span>
-              </li>
-              <li className="flex items-center justify-between">
-                <span className="text-muted-foreground">Max Altitude</span>
-                <span>10 (m)</span>
-              </li>
+              {has("temperature") && (
+                <li className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Temperature</span>
+                  {temperature !== null ? (
+                    <span>{temperature} (°C)</span>
+                  ) : (
+                    unknown
+                  )}
+                </li>
+              )}
+              {info?.max_speed != null && (
+                <li className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Max Speed</span>
+                  <span>{info.max_speed} (m/s)</span>
+                </li>
+              )}
+              {info?.max_altitude != null && (
+                <li className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Max Altitude</span>
+                  <span>{info.max_altitude} (m)</span>
+                </li>
+              )}
             </ul>
             <Separator className="my-2" />
           </div>
@@ -95,7 +115,7 @@ export default function DroneInfo() {
                 {flight_time !== null ? (
                   <span>{flight_time} (s)</span>
                 ) : (
-                  <span>Unkown</span>
+                  unknown
                 )}
               </li>
               <li className="flex items-center justify-between">
@@ -103,7 +123,7 @@ export default function DroneInfo() {
                 {speed !== null ? (
                   <span>{speed} (m/s)</span>
                 ) : (
-                  <span>Unkown</span>
+                  unknown
                 )}
               </li>
               <li className="flex items-center justify-between">
@@ -111,17 +131,29 @@ export default function DroneInfo() {
                 {altitude !== null ? (
                   <span>{altitude} (m)</span>
                 ) : (
-                  <span>Unkown</span>
+                  unknown
                 )}
               </li>
-              <li className="flex items-center justify-between">
-                <span className="text-muted-foreground">Total Distance</span>
-                {distance !== null ? (
-                  <span>{distance} (m/s)</span>
-                ) : (
-                  <span>Unkown</span>
-                )}
-              </li>
+              {has("position") && (
+                <li className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Position</span>
+                  {x !== null && y !== null ? (
+                    <span>
+                      {x}, {y} (m){heading !== null && ` · ${heading}°`}
+                    </span>
+                  ) : (
+                    unknown
+                  )}
+                </li>
+              )}
+              {has("tof_sensor") && (
+                <li className="flex items-center justify-between">
+                  <span className="text-muted-foreground">
+                    Obstacle Distance
+                  </span>
+                  {distance !== null ? <span>{distance} (m)</span> : unknown}
+                </li>
+              )}
             </ul>
           </div>
         </CardContent>

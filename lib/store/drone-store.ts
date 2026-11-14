@@ -1,104 +1,149 @@
 import { create } from "zustand";
-import axios from "axios";
-// import { DroneState } from "@/types";
 import { toast } from "sonner";
+import * as droneApi from "@/lib/drone";
+import type { DroneInfo } from "@/lib/drone";
 
 interface DroneState {
-  flight_time: number | null;
+  // Connection
+  connected: boolean;
+  info: DroneInfo | null;
+  // Telemetry
   isFlying: boolean;
+  sequenceRunning: boolean;
+  flight_time: number | null;
   batteryLevel: number | null;
   speed: number | null;
   distance: number | null;
   temperature: number | null;
   altitude: number | null;
+  x: number | null;
+  y: number | null;
+  heading: number | null;
   videoFeedUrl: string;
   warningMessage: string;
+  // Actions
+  fetchDroneInfo: () => Promise<void>;
   takeoff: () => Promise<void>;
   land: () => Promise<void>;
+  emergencyStop: () => Promise<void>;
   fetchDroneStatus: () => Promise<void>;
   performSequence: () => Promise<void>;
+  abortSequence: () => Promise<void>;
   controlDrone: (direction: string, speed?: number) => Promise<void>;
 }
 
-const API_BASE_URL = "http://localhost:3000/api";
 const useDroneStore = create<DroneState>((set, get) => ({
+  connected: false,
+  info: null,
   isFlying: false,
+  sequenceRunning: false,
   flight_time: null,
   batteryLevel: null,
   speed: null,
   distance: null,
   temperature: null,
   altitude: null,
-  videoFeedUrl: `${API_BASE_URL}/video_feed`,
+  x: null,
+  y: null,
+  heading: null,
+  videoFeedUrl: droneApi.getVideoFeedUrl(),
   warningMessage: "",
-  takeoff: async () => {
+
+  fetchDroneInfo: async () => {
     try {
-      const { batteryLevel } = get();
-      if (batteryLevel !== null && batteryLevel < 10) {
-        set({ warningMessage: "Battery level is too low to take off." });
-        toast.warning("Battery level is too low to take off.");
-        return;
-      }
-      await axios.post(`${API_BASE_URL}/takeoff`);
+      const data = await droneApi.getDroneInfo();
+      set({ info: data, connected: true });
+    } catch (error) {
+      set({ connected: false });
+    }
+  },
+
+  takeoff: async () => {
+    const { batteryLevel } = get();
+    if (batteryLevel !== null && batteryLevel < 10) {
+      set({ warningMessage: "Battery level is too low to take off." });
+      toast.warning("Battery level is too low to take off.");
+      return;
+    }
+    try {
+      await droneApi.takeoff();
       set({ isFlying: true, warningMessage: "" });
     } catch (error) {
-      console.error(error);
-      toast.error("Error taking off.");
+      toast.error(droneApi.errorMessage(error, "Error taking off."));
     }
   },
+
   land: async () => {
     try {
-      await axios.post(`${API_BASE_URL}/land`);
+      await droneApi.land();
       set({ isFlying: false });
     } catch (error) {
-      console.error("Error landing:", error);
+      toast.error(droneApi.errorMessage(error, "Error landing."));
     }
   },
+
+  emergencyStop: async () => {
+    try {
+      await droneApi.emergencyStop();
+      set({ isFlying: false, sequenceRunning: false });
+      toast.warning("Emergency stop: motors cut.");
+    } catch (error) {
+      toast.error(droneApi.errorMessage(error, "Emergency stop failed."));
+    }
+  },
+
   fetchDroneStatus: async () => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/drone_status`);
-      const data = response.data;
+      const data = await droneApi.getStatus();
       if (data.status === "success") {
         set({
+          connected: true,
+          isFlying: data.is_flying,
+          sequenceRunning: data.sequence_running,
           flight_time: data.flight_time,
           batteryLevel: data.battery_level,
           speed: data.speed,
           distance: data.distance,
           temperature: data.temperature,
           altitude: data.altitude,
+          x: data.x,
+          y: data.y,
+          heading: data.heading,
         });
-      } else {
-        console.error("Error fetching drone status:", data.message);
-        // toast.error(data.message);
       }
     } catch (error) {
-      console.error("Error fetching drone status:", error);
+      set({ connected: false });
     }
   },
+
   performSequence: async () => {
     try {
-      const response = await axios.post(`${API_BASE_URL}/perform_sequence`);
-      const data = response.data;
-      if (data.status === "success") {
-        console.log("Sequence completed successfully");
-      } else {
-        console.error("Error performing sequence:", data.message);
-      }
+      await droneApi.performSequence();
+      set({ sequenceRunning: true });
     } catch (error) {
-      console.error("Error performing sequence:", error);
+      toast.error(droneApi.errorMessage(error, "Could not start sequence."));
     }
   },
+
+  abortSequence: async () => {
+    try {
+      await droneApi.abortSequence();
+    } catch (error) {
+      toast.error(droneApi.errorMessage(error, "Could not abort sequence."));
+    }
+  },
+
   controlDrone: async (direction, speed = 50) => {
     try {
-      await axios.post(`${API_BASE_URL}/control`, {
-        direction,
-        speed,
-      });
+      await droneApi.control(direction, speed);
     } catch (error) {
-      toast.error(`Error controlling drone (${direction} at speed ${speed})`);
-      console.error(
-        `Error controlling drone (${direction} at speed ${speed}):`,
-        error
+      // Fixed id: a held key repeats, so keep a single toast instead of a stack.
+      toast.error(
+        droneApi.errorMessage(
+          error,
+          `Error controlling drone (${direction} at speed ${speed})`
+        ),
+        { id: "control-error" }
       );
     }
   },
