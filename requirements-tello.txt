@@ -1,0 +1,3 @@
+# Extra dependencies for a real DJI/Ryze Tello (DRONE_TYPE=tello)
+-r requirements.txt
+djitellopy==2.5.0
