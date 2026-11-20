@@ -1,78 +1,132 @@
-<p align="center">
-  <a href="https://nextjs-flask-starter.vercel.app/">
-    <img src="https://assets.vercel.com/image/upload/v1588805858/repositories/vercel/logo.png" height="96">
-    <h3 align="center">Next.js Flask Starter</h3>
-  </a>
-</p>
+# terraBot
 
-<p align="center">Simple Next.js boilerplate that uses <a href="https://flask.palletsprojects.com/">Flask</a> as the API backend.</p>
+An open-source web dashboard for flying drones: live video, telemetry and keyboard control in the browser, on top of a small **drone adapter layer** so the same UI can drive different drones.
 
-<br/>
+It ships with a **built-in simulator**, so you can try everything without any hardware.
 
-## Introduction
+| Drone | Status |
+|---|---|
+| Simulator (`sim`) | Working. The default, needs no hardware |
+| DJI / Ryze Tello (`tello`) | Supported through `djitellopy` |
+| MAVLink (PX4 / ArduPilot) | Planned |
+| ROS 2 / NVIDIA Isaac Sim | Ideas, see [Adding a drone](#adding-a-drone) |
 
-This is a hybrid Next.js + Python app that uses Next.js as the frontend and Flask as the API backend. One great use case of this is to write Next.js apps that use Python AI libraries on the backend.
+## Quick start (simulator)
 
-## How It Works
-
-The Python/Flask server is mapped into to Next.js app under `/api/`.
-
-This is implemented using [`next.config.js` rewrites](https://github.com/vercel/examples/blob/main/python/nextjs-flask/next.config.js) to map any request to `/api/:path*` to the Flask API, which is hosted in the `/api` folder.
-
-On localhost, the rewrite will be made to the `127.0.0.1:5328` port, which is where the Flask server is running.
-
-In production, the Flask server is hosted as [Python serverless functions](https://vercel.com/docs/concepts/functions/serverless-functions/runtimes/python) on Vercel.
-
-## Demo
-
-https://nextjs-flask-starter.vercel.app/
-
-## Deploy Your Own
-
-You can clone & deploy it to Vercel with one click:
-
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?demo-title=Next.js%20Flask%20Starter&demo-description=Simple%20Next.js%20boilerplate%20that%20uses%20Flask%20as%20the%20API%20backend.&demo-url=https%3A%2F%2Fnextjs-flask-starter.vercel.app%2F&demo-image=%2F%2Fimages.ctfassets.net%2Fe5382hct74si%2F795TzKM3irWu6KBCUPpPz%2F44e0c6622097b1eea9b48f732bf75d08%2FCleanShot_2023-05-23_at_12.02.15.png&project-name=Next.js%20Flask%20Starter&repository-name=nextjs-flask-starter&repository-url=https%3A%2F%2Fgithub.com%2Fvercel%2Fexamples%2Ftree%2Fmain%2Fpython%2Fnextjs-flask&from=vercel-examples-repo)
-
-## Developing Locally
-
-You can clone & create this repo with the following command
+You need **Node 18+**, [pnpm](https://pnpm.io) and **Python 3.9+**.
 
 ```bash
-npx create-next-app nextjs-flask --example "https://github.com/vercel/examples/tree/main/python/nextjs-flask"
-```
-
-## Getting Started
-
-First, install the dependencies:
-
-```bash
-npm install
-# or
-yarn
-# or
 pnpm install
+pip3 install -r requirements.txt
+pnpm run dev
 ```
 
-Then, run the development server:
+Open <http://localhost:3000>, press **Launch** (or `e`) and fly with the keys below.
+
+`pnpm run dev` starts both servers: Next.js on port 3000 and the Flask API on port 5328. In development Next.js proxies `/api/*` to Flask (see `next.config.js`).
+
+### Controls
+
+| Key | Action |
+|---|---|
+| `e` / `q` | Take off / land |
+| Arrow keys | Forward, backward, strafe left, strafe right |
+| `w` / `s` | Up / down |
+| `a` / `d` | Rotate counter-clockwise / clockwise |
+
+Hold a key to keep moving. If commands stop arriving for 1 second, the drone stops by itself. The **Emergency Stop** button cuts the motors immediately (the drone will fall).
+
+## Using a real Tello
+
+1. Install the extra dependency: `pip3 install -r requirements-tello.txt`
+2. Connect your computer to the Tello's Wi-Fi network.
+3. Start with `DRONE_TYPE=tello`:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
+DRONE_TYPE=tello pnpm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+You can also copy `.env.example` to `.env` and set `DRONE_TYPE` there. Note that while connected to the Tello's Wi-Fi your computer has no internet access, so install dependencies first.
 
-The Flask server will be running on [http://127.0.0.1:5328](http://127.0.0.1:5328) – feel free to change the port in `package.json` (you'll also need to update it in `next.config.js`).
+> **Safety:** fly in an open area, keep the drone in sight, and follow your local drone regulations. This project is not a flight-safety system.
 
-## Learn More
+## Configuration
 
-To learn more about Next.js, take a look at the following resources:
+| Variable | Default | Meaning |
+|---|---|---|
+| `DRONE_TYPE` | `sim` | Which adapter the backend uses (`sim`, `tello`) |
+| `NEXT_PUBLIC_API_BASE` | `/api` | Where the frontend finds the API |
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-- [Flask Documentation](https://flask.palletsprojects.com/en/1.1.x/) - learn about Flask features and API.
+## Architecture
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js/) - your feedback and contributions are welcome!
+```
+Browser (Next.js, React, Tailwind, shadcn/ui, Zustand)
+   │  HTTP  /api/*          video: MJPEG stream at /api/video_feed
+   ▼
+Flask API  (api/index.py)        ← routes only, no drone-specific code
+   │
+   ▼
+DroneAdapter interface  (api/drones/base.py)
+   ├── SimulatedDrone   (sim.py)
+   ├── TelloAdapter     (tello.py)
+   └── your adapter…    (registered in registry.py)
+```
+
+The frontend and the routes only know the `DroneAdapter` interface. The UI asks `/api/drone_info` which **capabilities** the connected drone has (`video`, `temperature`, `tof_sensor`, `position`) and shows only the matching widgets.
+
+### API
+
+| Endpoint | Description |
+|---|---|
+| `GET /api/drone_info` | Name, description, capabilities, limits, whether it is simulated |
+| `GET /api/drone_status` | Telemetry: battery, altitude, speed, flight time, position… |
+| `GET /api/battery` | Battery percentage |
+| `POST /api/takeoff`, `POST /api/land` | Take off / land |
+| `POST /api/emergency_stop` | Cut the motors immediately |
+| `POST /api/control` | `{"direction": "forward", "speed": 50}` or `{"forward": 0, "right": 0, "up": 0, "yaw": 0}` (each -100..100) |
+| `POST /api/perform_sequence`, `POST /api/abort_sequence` | Run or abort a scripted flight in the background |
+| `GET /api/video_feed` | MJPEG video stream |
+
+Errors return `{"status": "error", "message": "..."}`. A command the drone cannot perform right now (for example taking off twice) returns HTTP 409.
+
+## Adding a drone
+
+1. Create `api/drones/mydrone.py` with a class that extends `DroneAdapter` and implements `connect`, `disconnect`, `takeoff`, `land`, `emergency_stop`, `_send_move`, `get_telemetry` and `frames`. Set `name`, `description` and `capabilities`.
+   - `_send_move(forward, right, up, yaw)` receives values already clamped to -100..100 (+forward, +right, +up, +clockwise).
+   - `get_telemetry()` returns a `Telemetry`. Use SI units (metres, m/s) and leave unknown fields as `None`.
+   - `frames()` yields JPEG bytes.
+   - Raise `DroneError` when a command fails or is not allowed.
+2. Register it in `api/drones/registry.py`. Import optional dependencies lazily inside the factory, so the other drones keep working without them.
+3. Run `DRONE_TYPE=mydrone pnpm run dev`.
+
+The movement watchdog and the scripted-sequence runner come from the base class, and `api/drones/sim.py` is the reference implementation.
+
+## Tests
+
+```bash
+pip3 install -r requirements-dev.txt
+pnpm run test:api
+```
+
+The tests run against the simulator, so they need no hardware.
+
+## Project layout
+
+```
+api/            Flask API and drone adapters
+  drones/       base.py, registry.py, sim.py, tello.py
+app/            Next.js pages (home dashboard; gallery, map and notifications are placeholders)
+components/     UI components (drone/ holds the dashboard widgets)
+lib/            API client (drone.ts) and Zustand store
+tests/          pytest suite
+```
+
+## Status and ideas
+
+Early stage. Possible next steps: object detection on the video feed (the EfficientDet model is already in `api/models/`), a MAVLink adapter for PX4 / ArduPilot (which would also cover PX4-based simulators such as Isaac Sim's Pegasus extension), mission planning on the map page, and a media gallery.
+
+The Flask backend needs to run on a machine that can reach the drone, so it is not meant to be deployed to serverless hosting.
+
+## License
+
+No license has been chosen yet. Until one is added, all rights are reserved by default.

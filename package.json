@@ -1,11 +1,13 @@
 {
-  "name": "next-flask",
+  "name": "terrabot",
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "flask-dev": "FLASK_DEBUG=1 pip3 install -r requirements.txt && python3 -m flask --app api/index run -p 5328",
+    "py-install": "pip3 install -r requirements.txt",
+    "flask-dev": "FLASK_DEBUG=1 python3 -m flask --app api/index run -p 5328",
     "next-dev": "next dev",
     "dev": "concurrently \"pnpm run next-dev\" \"pnpm run flask-dev\"",
+    "test:api": "python3 -m pytest tests",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"
@@ -51,6 +53,6 @@
     "zustand": "^4.5.2"
   },
   "engines": {
-    "node": "18.x"
+    "node": ">=18"
   }
 }

@@ -1,168 +1,143 @@
-from flask import Flask, Response, jsonify
+from flask import Flask, Response, jsonify, request
 from flask_cors import CORS
-from djitellopy import Tello
-import cv2
-import mediapipe as mp
-from mediapipe.tasks import python
-from mediapipe.tasks.python import vision
-from time import sleep
+
+from drones import DroneError, get_drone
 
 app = Flask(__name__)
-tello = Tello()
-
 CORS(app)
 
-# MediaPipe setup
-mp_drawing = mp.solutions.drawing_utils
-BaseOptions = mp.tasks.BaseOptions
-ObjectDetector = mp.tasks.vision.ObjectDetector
-ObjectDetectorOptions = mp.tasks.vision.ObjectDetectorOptions
-VisionRunningMode = mp.tasks.vision.RunningMode
+# Which drone is used is chosen by the DRONE_TYPE env var (default: "sim").
+# See api/drones/registry.py.
 
-# Load model
-model_path = 'api/models/efficientdet_lite0.tflite'
-options = ObjectDetectorOptions(
-    base_options=BaseOptions(model_asset_path=model_path),
-    running_mode=VisionRunningMode.VIDEO)
-detector = ObjectDetector.create_from_options(options)
-
-
-@app.route('/api/takeoff', methods=['POST'])
-def takeoff():
-    tello.connect()
-    tello.streamon()
-    tello.takeoff()
-    return {"status": "success", "message": "Drone took off"}
+# Legacy direction names used by the frontend -> (forward, right, up, yaw).
+DIRECTIONS = {
+    "forward": (1, 0, 0, 0),
+    "backward": (-1, 0, 0, 0),
+    "left": (0, -1, 0, 0),
+    "right": (0, 1, 0, 0),
+    "up": (0, 0, 1, 0),
+    "down": (0, 0, -1, 0),
+    "ccw": (0, 0, 0, -1),
+    "cw": (0, 0, 0, 1),
+}
 
 
-@app.route('/api/land', methods=['POST'])
-def land():
-    tello.land()
-    tello.streamoff()
-    tello.end()
+def ok(**extra):
+    return jsonify({"status": "success", **extra})
 
-    return {"status": "success", "message": "Drone landed"}
+
+def fail(message, code=500):
+    return jsonify({"status": "error", "message": message}), code
+
+
+@app.errorhandler(DroneError)
+def handle_drone_error(exc):
+    return fail(str(exc), 409)
 
 
 @app.route("/api/healthchecker", methods=["GET"])
 def healthchecker():
-    return {"status": "success", "message": "Integrate Flask Framework with Next.js"}
+    return ok(message="Integrate Flask Framework with Next.js")
 
 
-def generate_frames():
-    tello.connect()
-    tello.streamon()
-    while True:
-        frame_read = tello.get_frame_read()
-        frame = frame_read.frame
-        # Convert the frame from BGR to RGB
-        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        ret, buffer = cv2.imencode('.jpg', frame)
-        frame = buffer.tobytes()
-        yield (b'--frame\r\n'
-               b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+@app.route("/api/drone_info", methods=["GET"])
+def drone_info():
+    return ok(**get_drone().info())
 
 
-@app.route('/api/video_feed')
-def video_feed():
-    return Response(generate_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
+@app.route("/api/takeoff", methods=["POST"])
+def takeoff():
+    get_drone().takeoff()
+    return ok(message="Drone took off")
 
 
-@app.route('/api/drone_status', methods=['GET'])
+@app.route("/api/land", methods=["POST"])
+def land():
+    get_drone().land()
+    return ok(message="Drone landed")
+
+
+@app.route("/api/emergency_stop", methods=["POST"])
+def emergency_stop():
+    drone = get_drone()
+    drone.abort_sequence()
+    drone.emergency_stop()
+    return ok(message="Motors stopped")
+
+
+@app.route("/api/drone_status", methods=["GET"])
 def drone_status():
-    try:
-        if not tello.connect():
-            tello.connect()
-
-        # Gather information from the drone
-        flight_time = tello.get_flight_time()
-        battery_level = tello.get_battery()
-        speed = tello.get_speed_x()
-        distance = tello.get_distance_tof()
-        temperature = tello.get_temperature()
-        altitude = tello.get_height()
-
-        return jsonify({
-            'status': 'success',
-            'flight_time': flight_time,
-            'battery_level': battery_level,
-            'speed': speed,
-            'distance': distance,
-            'temperature': temperature,
-            'altitude': altitude
-        })
-    except Exception as e:
-        return jsonify({
-            'status': 'error',
-            'message': str(e)
-        })
+    drone = get_drone()
+    t = drone.get_telemetry()
+    return ok(
+        # Keys the current frontend reads:
+        flight_time=t.flight_time,
+        battery_level=t.battery,
+        speed=t.speed,
+        distance=t.distance,
+        temperature=t.temperature,
+        altitude=t.altitude,
+        # Extra fields:
+        is_flying=t.is_flying,
+        sequence_running=drone.sequence_running,
+        x=t.x,
+        y=t.y,
+        heading=t.heading,
+    )
 
 
-@app.route('/api/perform_sequence', methods=['POST'])
-def perform_sequence():
-    try:
-        if not tello.connect():
-            tello.connect()
-
-        tello.takeoff()
-        sleep(2)
-        # move forward
-        tello.send_rc_control(0, 50, 0, 0)
-        sleep(2)
-        # rotate 90 degrees
-        tello.send_rc_control(0, 0, 0, 60)
-        sleep(2)
-        # move forward
-        tello.send_rc_control(0, 50, 0, 0)
-        sleep(2)
-        # rotate 90 degrees
-        tello.send_rc_control(0, 0, 0, 50)
-        sleep(2)
-        # move forward
-        tello.send_rc_control(0, 50, 0, 0)
-        sleep(2)
-        # stop
-        tello.send_rc_control(0, 0, 0, 0)
-        tello.land()
-
-        return jsonify({
-            'status': 'success',
-            'message': 'Sequence completed successfully'
-        })
-    except Exception as e:
-        return jsonify({
-            'status': 'error',
-            'message': str(e)
-        }), 500
+@app.route("/api/battery", methods=["GET"])
+def battery():
+    return ok(battery_level=get_drone().get_telemetry().battery)
 
 
-@app.route('/api/control', methods=['POST'])
+@app.route("/api/control", methods=["POST"])
 def control():
-    try:
-        if not tello.connect():
-            tello.connect()
+    """Accepts either {"direction": "forward", "speed": 50} or
+    {"forward": 0, "right": 0, "up": 0, "yaw": 0} (each -100..100)."""
+    body = request.get_json(silent=True) or {}
+    drone = get_drone()
 
-        direction = request.json.get("direction")
-        speed = request.json.get("speed", 50)
+    if "direction" in body:
+        direction = body["direction"]
+        if direction not in DIRECTIONS:
+            return fail(f"Unknown direction '{direction}'", 400)
+        try:
+            speed = float(body.get("speed", 50))
+        except (TypeError, ValueError):
+            return fail("speed must be a number", 400)
+        drone.move(*(axis * speed for axis in DIRECTIONS[direction]))
+    else:
+        try:
+            axes = {k: float(body.get(k, 0)) for k in ("forward", "right", "up", "yaw")}
+        except (TypeError, ValueError):
+            return fail("Axis values must be numbers", 400)
+        drone.move(**axes)
 
-        control_values = {
-            "forward": (speed, 0, 0, 0),
-            "backward": (-speed, 0, 0, 0),
-            "left": (0, 0, 0, -speed),
-            "right": (0, 0, 0, speed),
-            "up": (0, 0, speed, 0),
-            "down": (0, 0, -speed, 0),
-            "cw": (0, -speed, 0, 0),
-            "ccw": (0, speed, 0, 0),
-        }
+    return ok(message="Control command sent successfully")
 
-        control_values = control_values.get(direction, (0, 0, 0, 0))
-        tello.send_rc_control(*control_values)
 
-        return jsonify({"status": "success", "message": "Control command sent successfully"})
+@app.route("/api/perform_sequence", methods=["POST"])
+def perform_sequence():
+    get_drone().start_sequence()
+    return ok(message="Sequence started")
 
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route("/api/abort_sequence", methods=["POST"])
+def abort_sequence():
+    get_drone().abort_sequence()
+    return ok(message="Sequence aborted")
+
+
+@app.route("/api/video_feed")
+def video_feed():
+    drone = get_drone()
+
+    def generate():
+        for frame in drone.frames():
+            yield b"--frame\r\nContent-Type: image/jpeg\r\n\r\n" + frame + b"\r\n"
+
+    return Response(generate(), mimetype="multipart/x-mixed-replace; boundary=frame")
 
 
 if __name__ == "__main__":
